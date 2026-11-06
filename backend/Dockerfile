@@ -1,31 +1,34 @@
-# Stage 1
-FROM node:21 AS backend-builder
+# ==========================================
+# Stage 1: Builder
+# ==========================================
+FROM node:22-bookworm-slim AS builder
 
-# setup the working dir
 WORKDIR /app
 
-# code
+COPY package*.json ./
+
+RUN npm ci
+
 COPY . .
 
-# packages install
-RUN npm i
+# Remove development dependencies
+RUN npm prune --omit=dev
 
-# tests
-RUN npm run test
 
-# Stage 2
-FROM node:21-slim
+# ==========================================
+# Stage 2: Production
+# ==========================================
+FROM node:22-bookworm-slim AS production
 
-# setup the working dir
 WORKDIR /app
 
-# copy the above stage as compressed
-COPY --from=backend-builder /app .
+ENV NODE_ENV=production
 
-COPY .env.docker .env
+# Copy production dependencies and application
+COPY --from=builder --chown=node:node /app /app
 
-# Port
+USER node
+
 EXPOSE 8080
 
-# App
-CMD ["npm", "start"]
+CMD ["node", "server.js"]
